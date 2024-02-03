@@ -1,0 +1,302 @@
+use std::io::Read;
+use std::{io, mem};
+use std::net::Ipv4Addr;
+use std::os::fd::{AsRawFd, RawFd};
+
+use libc::{c_char, c_uchar, c_uint, socklen_t, AF_SYS_CONTROL, IFNAMSIZ, NOEXPR};
+use crate::address::Ipv4AddrExt;
+use crate::configuration::Layer;
+use crate::interface::Interface;
+use crate::platform::macos::tun;
+use crate::platform::posix::Fd;
+use crate::{error::*, syscall};
+use crate::{configuration::Configuration, error::Error};
+
+use super::sys::*;
+
+
+pub struct Queue {
+    tun: Fd
+}
+
+impl Queue {
+    pub fn has_packet_information(&self) -> bool {
+        // alway true for macos
+        true
+    }
+
+    fn set_nonblocking(&self) -> io::Result<()> {
+        self.tun.set_nonblocking(true)
+    }
+
+    fn cancel_nonblocking(&self) -> io::Result<()> {
+        self.tun.set_nonblocking(false)
+    }
+}
+
+impl AsRawFd for Queue {
+    fn as_raw_fd(&self) -> RawFd {
+        self.tun.as_raw_fd()
+    }
+}
+
+
+pub struct Tun {
+    name: String,
+    queue: Queue,
+    ctl: Fd,
+}
+
+impl Tun {
+    pub fn new(config: &Configuration) -> Result<Self> {
+        let id = if let Some(name) = config.name.as_ref() {
+            if name.len() > IFNAMSIZ {
+                return Err(Error::NameTooLong);
+            }
+            if !name.starts_with("utun") {
+                return Err(Error::InvalidName);
+            }
+
+            name[4..].parse::<u32>()? // +1u32 // why?
+        } else {
+            0u32
+        };
+
+        if config.layer != Layer::L3 {
+            return Err(Error::UnsupportedLayer);
+        }
+
+        let queue_number = config.queues.unwrap_or(1);
+        if queue_number != 1 {
+            return Err(Error::InvalidQueuesNumber);
+        }
+
+        let tun_fd = syscall!(socket(
+            libc::AF_SYSTEM,
+            libc::SOCK_DGRAM,
+            libc::SYSPROTO_CONTROL
+        ))?;
+
+        // get ctl id with utun control name
+        let mut info: libc::ctl_info = unsafe { std::mem::zeroed() };
+        UTUN_CONTROL_NAME
+            .bytes()
+            .zip(info.ctl_name.iter_mut())
+            .for_each(|(b , ptr)| *ptr = b as c_char);
+        info.ctl_id = 0;
+        syscall!(ioctl(
+            tun_fd,
+            libc::CTLIOCGINFO,
+            &mut info as *mut _ as *mut libc::c_void
+        ))?;
+
+        // connect to sys control interface
+        let mut addr: libc::sockaddr_ctl = unsafe { std::mem::zeroed() };
+        addr.sc_id = info.ctl_id;
+        addr.sc_len = mem::size_of::<libc::sockaddr_ctl>() as c_uchar;
+        addr.sc_family = libc::AF_SYSTEM as c_uchar;
+        addr.ss_sysaddr = AF_SYS_CONTROL as _;
+        addr.sc_unit = id as c_uint;
+        // addr.sc_reserved = [0; 5];
+        syscall!(connect(
+            tun_fd,
+            &addr as *const libc::sockaddr_ctl as *const libc::sockaddr,
+            mem::size_of::<libc::sockaddr_ctl>() as libc::socklen_t
+        ))?;
+
+        // todo: set nonblonking
+
+        // get interface name
+        let mut ifname = [0u8; IFNAMSIZ];
+        let mut len = ifname.len();
+        syscall!(getsockopt(
+            tun_fd,
+            libc::SYSPROTO_CONTROL,
+            libc::UTUN_OPT_IFNAME,
+            ifname.as_mut_ptr() as *mut libc::c_void,
+            &mut len as *mut usize as *mut socklen_t
+        ))?;
+
+        // new a control fd
+        let ctl_fd = syscall!(socket(
+            libc::AF_INET,
+            libc::SOCK_DGRAM,
+            0
+        ))?;
+
+        let mut tun = Self {
+            name: String::from_utf8_lossy(&ifname).into_owned(),
+            queue: Queue { tun: Fd::new(tun_fd)? },
+            ctl: Fd::new(ctl_fd)?,
+        };
+
+        tun.configure(config)?;
+
+        Ok(tun)
+    }
+
+    fn ifreq(&self) -> libc::ifreq {
+        let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
+
+        if !self.name.is_empty() {
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    self.name.as_ptr() as *const c_char, 
+                    ifr.ifr_name.as_mut_ptr(), 
+                    self.name.len()
+                )
+            }
+        }
+
+        ifr
+    }
+
+    pub fn set_nonblocking(&self) -> io::Result<()> {
+        self.queue.set_nonblocking()
+    }
+
+    pub fn cancel_nonblocking(&self) -> io::Result<()> {
+        self.queue.cancel_nonblocking()
+    }
+}
+
+impl AsRawFd for Tun {
+    fn as_raw_fd(&self) -> RawFd {
+        self.queue.tun.0
+    }
+}
+
+impl Interface for Tun {
+    type Queue = Queue;
+
+    fn name(&self) -> Result<&str> {
+        Ok(&self.name)
+    }
+    // can not set interface name on Darwin
+    fn set_name(&mut self, _name: &str) -> Result<()> {
+        Err(Error::InvalidName)
+    }
+
+    fn enable(&mut self, value: bool) -> Result<()> {
+        let mut flags = self.flags(None)?;
+
+        if value {
+            flags |= libc::IFF_UP as i16 | libc::IFF_RUNNING as i16;
+        } else {
+            flags &= !(libc::IFF_UP as i16);
+        }
+
+        self.flags(Some(flags)).and(Ok(()))
+    }
+    fn flags(&self, flags: Option<i16>) -> Result<i16> {
+        let mut ifr = self.ifreq();
+
+        if let Some(flags) = flags {
+            ifr.ifr_ifru.ifru_flags = flags;
+            unsafe { siocsifflags(self.ctl.as_raw_fd(), &ifr) }?;
+        } else {
+            unsafe { siocgifflags(self.ctl.as_raw_fd(), &mut ifr) }?;
+        }
+
+        Ok(unsafe {ifr.ifr_ifru.ifru_flags} )
+    }
+
+    fn address(&self) -> Result<Ipv4Addr> {
+        let mut ifr: libc::ifreq = self.ifreq();
+        unsafe { siocgifaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
+
+        Ok(Ipv4Addr::from_sockaddr(
+            unsafe { ifr.ifr_ifru.ifru_addr }
+        ))
+    }
+    fn set_address(&mut self, addr: Ipv4Addr) -> Result<()> {
+        let mut ifr = self.ifreq();
+        ifr.ifr_ifru.ifru_addr = addr.to_sockaddr();
+
+        unsafe { siocsifaddr(self.ctl.as_raw_fd(), &ifr) }?;
+
+        Ok(())
+    }
+
+    fn destination(&self) -> Result<Ipv4Addr> {
+        let mut ifr: libc::ifreq = self.ifreq();
+        unsafe { siocgifdstaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
+
+        Ok(Ipv4Addr::from_sockaddr(
+            // access to union field is unsafe
+            unsafe { ifr.ifr_ifru.ifru_dstaddr  }
+        ))
+    }
+    fn set_destination(&mut self, addr: Ipv4Addr) -> Result<()> {
+        let mut ifr = self.ifreq();
+        ifr.ifr_ifru.ifru_dstaddr = addr.to_sockaddr();
+
+        unsafe { siocsifdstaddr(self.ctl.as_raw_fd(), &ifr) }?;
+        
+        Ok(())
+    }
+
+    fn broadcast(&self) -> Result<Ipv4Addr> {
+        let mut ifr: libc::ifreq = self.ifreq();
+        unsafe { siocgifbrdaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
+
+        Ok(Ipv4Addr::from_sockaddr(
+            unsafe { ifr.ifr_ifru.ifru_broadaddr }
+        ))
+    }
+    fn set_broadcast(&mut self, addr: Ipv4Addr) -> Result<()> {
+        let mut ifr = self.ifreq();
+        ifr.ifr_ifru.ifru_broadaddr = addr.to_sockaddr();
+
+        unsafe { siocsifbrdaddr(self.ctl.as_raw_fd(), &ifr) }?;
+        
+        Ok(())
+    }
+
+    fn netmask(&self) -> Result<Ipv4Addr> {
+        let mut ifr = self.ifreq();
+        unsafe { siocgifnetmask(self.ctl.as_raw_fd(), &mut ifr) }?;
+
+        Ok(Ipv4Addr::from_sockaddr(
+            unsafe { ifr.ifr_ifru.ifru_addr }
+        ))
+    }
+    fn set_netmask(&mut self, addr: Ipv4Addr) -> Result<()> {
+        let mut ifr = self.ifreq();
+        ifr.ifr_ifru.ifru_addr = addr.to_sockaddr();
+
+        unsafe { siocsifnetmask(self.ctl.as_raw_fd(), &ifr) }?;
+
+        Ok(())
+    }
+
+    fn mtu(&self) -> Result<i32> {
+        let mut ifr = self.ifreq();
+        unsafe { siocgifmtu(self.ctl.as_raw_fd(), &mut ifr) }?;
+
+        Ok(unsafe { ifr.ifr_ifru.ifru_mtu })
+    }
+
+    fn set_mtu(&mut self, mtu: i32) -> Result<()> {
+        let mut ifr = self.ifreq();
+        ifr.ifr_ifru.ifru_mtu = mtu;
+
+        unsafe { siocsifmtu(self.ctl.as_raw_fd(), &ifr) }?;
+
+        Ok(())
+    }
+
+    fn queue(&mut self, index: usize) -> Option<&mut Self::Queue> {
+        if index > 0 {
+            return None;
+        }
+
+        Some(&mut self.queue)
+    }
+}
+
+impl Read for Tun {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.queue.tun.read(buf)
+    }
+}
