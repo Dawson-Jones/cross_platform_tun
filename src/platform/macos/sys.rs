@@ -7,10 +7,10 @@ pub const UTUN_CONTROL_NAME: &str = "com.apple.net.utun_control";
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct ifaliasreq {
-    ifra_name: [libc::c_char; libc::IFNAMSIZ],
-    ifra_addr: libc::sockaddr,
-    ifra_broadaddr: libc::sockaddr,
-    ifra_mask: libc::sockaddr,
+    pub ifra_name: [libc::c_char; libc::IFNAMSIZ],
+    pub ifra_addr: libc::sockaddr,
+    pub ifra_broadaddr: libc::sockaddr,
+    pub ifra_mask: libc::sockaddr,
 }
 
 nix::ioctl_readwrite!(ctliocginfo, b'N', 3, ctl_info);  // /* get id from name */

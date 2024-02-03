@@ -3,11 +3,10 @@ use std::{io, mem};
 use std::net::Ipv4Addr;
 use std::os::fd::{AsRawFd, RawFd};
 
-use libc::{c_char, c_uchar, c_uint, socklen_t, AF_SYS_CONTROL, IFNAMSIZ, NOEXPR};
+use libc::{c_char, c_uchar, c_uint, socklen_t, AF_SYS_CONTROL, IFNAMSIZ};
 use crate::address::Ipv4AddrExt;
 use crate::configuration::Layer;
 use crate::interface::Interface;
-use crate::platform::macos::tun;
 use crate::platform::posix::Fd;
 use crate::{error::*, syscall};
 use crate::{configuration::Configuration, error::Error};
@@ -132,6 +131,13 @@ impl Tun {
 
         tun.configure(config)?;
 
+        // use set_alias to ensure the netmask is set on macOS
+        tun.set_alias(
+            config.address.unwrap_or(Ipv4Addr::new(10, 0, 0, 1)),
+            config.destnation.unwrap_or(Ipv4Addr::new(10, 0, 0, 255)),
+            config.netmask.unwrap_or(Ipv4Addr::new(255, 255, 255, 0)),
+        )?;
+
         Ok(tun)
     }
 
@@ -149,6 +155,23 @@ impl Tun {
         }
 
         ifr
+    }
+
+    fn set_alias(&mut self, addr: Ipv4Addr, broadaddr: Ipv4Addr, mask: Ipv4Addr) -> Result<()> {
+        let mut ifar: ifaliasreq = unsafe { mem::zeroed() };
+        unsafe { std::ptr::copy_nonoverlapping(
+            self.name.as_ptr() as *const c_char,
+            ifar.ifra_name.as_mut_ptr(),
+            self.name.len()
+        ) };
+
+        ifar.ifra_addr = addr.to_sockaddr();
+        ifar.ifra_broadaddr = broadaddr.to_sockaddr();
+        ifar.ifra_mask = mask.to_sockaddr();
+
+        unsafe { siocaifaddr(self.ctl.as_raw_fd() , &ifar) }?;
+
+        Ok(())
     }
 
     pub fn set_nonblocking(&self) -> io::Result<()> {
