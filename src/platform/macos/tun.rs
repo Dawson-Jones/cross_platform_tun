@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::{io, mem};
 use std::net::Ipv4Addr;
 use std::os::fd::{AsRawFd, RawFd};
@@ -174,6 +174,10 @@ impl Tun {
         Ok(())
     }
 
+    pub fn has_packet_information(&self) -> bool {
+        self.queue.has_packet_information()
+    }
+
     pub fn set_nonblocking(&self) -> io::Result<()> {
         self.queue.set_nonblocking()
     }
@@ -321,5 +325,19 @@ impl Interface for Tun {
 impl Read for Tun {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.queue.tun.read(buf)
+    }
+}
+
+impl Write for Tun {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.queue.tun.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.queue.tun.flush()
+    }
+
+    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        self.queue.tun.write_vectored(bufs)
     }
 }

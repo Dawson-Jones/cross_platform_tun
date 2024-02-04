@@ -30,4 +30,5 @@ mod r#async;
         target_os = "android"
     )
 ))]
-pub use r#async::*;
+pub use r#async::create_as_async;
+pub use r#async::TunPacket;
