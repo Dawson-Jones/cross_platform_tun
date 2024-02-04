@@ -2,7 +2,7 @@ use cross_platform_tun::{Configuration, TunPacket};
 use futures::{SinkExt, StreamExt};
 use packet::{icmp, ip, Builder, Packet};
 
-
+// sudo route -q -n add -inet 192.168.108.0/24 -interface utun8
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
