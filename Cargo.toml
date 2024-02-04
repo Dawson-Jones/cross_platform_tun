@@ -32,12 +32,15 @@ packet = "0.1"
 
 [[example]]
 name = "async_read"
-require-features = ["async", "tokio/rt-multi-thread"]
+# required-features = ["async", "tokio/rt-multi-thread"]
+# required-features = ["async"]
 
 [[example]]
 name = "async_stream"
-require-features = ["async", "tokio/rt-multi-thread"]
+# required-features = ["async", "tokio/rt-multi-thread"]
+# required-features = ["async"]
 
 [[example]]
 name = "async_ping"
-require-features = ["async", "tokio/rt-multi-thread"]
+# required-features = ["async", "tokio/rt-multi-thread"]
+# required-features = ["async"]

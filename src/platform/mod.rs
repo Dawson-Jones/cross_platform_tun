@@ -16,7 +16,7 @@ pub mod posix;
 
 #[cfg(test)]
 mod test {
-    use std::{net::Ipv4Addr, os::unix::thread, thread::sleep, time::Duration};
+    use std::{net::Ipv4Addr, thread::sleep, time::Duration};
 
     use crate::{configuration::Configuration, interface::Interface};
 

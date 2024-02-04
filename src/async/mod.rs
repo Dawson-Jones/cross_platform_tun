@@ -1,13 +1,10 @@
-mod tun;
 mod codec;
+mod tun;
 
-use crate::{configuration::{self, Configuration}, create, error::Result};
+use crate::{configuration::Configuration, create, error::Result};
 
 use self::tun::AsyncTun;
 pub use codec::TunPacket;
-
-
-
 
 pub fn create_as_async(configuration: &Configuration) -> Result<AsyncTun> {
     let tun = create(configuration)?;

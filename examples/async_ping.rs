@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .destination("192.168.108.2")
         .up();
 
-    let mut dev = cross_platform_tun::create_as_async(&config)?;
+    let dev = cross_platform_tun::create_as_async(&config)?;
     let mut framed = dev.into_framed();
 
     while let Some(packet) = framed.next().await {
