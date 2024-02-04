@@ -1,21 +1,23 @@
 use std::io::{Read, Write};
-use std::{io, mem};
 use std::net::Ipv4Addr;
 use std::os::fd::{AsRawFd, RawFd};
+use std::{io, mem};
 
-use libc::{c_char, c_uchar, c_uint, socklen_t, AF_SYS_CONTROL, IFNAMSIZ};
 use crate::address::Ipv4AddrExt;
 use crate::configuration::Layer;
 use crate::interface::Interface;
 use crate::platform::posix::fd::Fd;
-use crate::{error::*, syscall};
 use crate::{configuration::Configuration, error::Error};
+use crate::{error::*, syscall};
+use libc::{c_char, c_uchar, c_uint, socklen_t, AF_SYS_CONTROL, IFNAMSIZ};
 
 use super::sys::*;
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TunConf {}
 
 pub struct Queue {
-    tun: Fd
+    tun: Fd,
 }
 
 impl Queue {
@@ -38,7 +40,6 @@ impl AsRawFd for Queue {
         self.tun.as_raw_fd()
     }
 }
-
 
 pub struct Tun {
     name: String,
@@ -81,7 +82,7 @@ impl Tun {
         UTUN_CONTROL_NAME
             .bytes()
             .zip(info.ctl_name.iter_mut())
-            .for_each(|(b , ptr)| *ptr = b as c_char);
+            .for_each(|(b, ptr)| *ptr = b as c_char);
         info.ctl_id = 0;
         syscall!(ioctl(
             tun_fd,
@@ -117,15 +118,13 @@ impl Tun {
         ))?;
 
         // new a control fd
-        let ctl_fd = syscall!(socket(
-            libc::AF_INET,
-            libc::SOCK_DGRAM,
-            0
-        ))?;
+        let ctl_fd = syscall!(socket(libc::AF_INET, libc::SOCK_DGRAM, 0))?;
 
         let mut tun = Self {
             name: String::from_utf8_lossy(&ifname).into_owned(),
-            queue: Queue { tun: Fd::new(tun_fd)? },
+            queue: Queue {
+                tun: Fd::new(tun_fd)?,
+            },
             ctl: Fd::new(ctl_fd)?,
         };
 
@@ -147,9 +146,9 @@ impl Tun {
         if !self.name.is_empty() {
             unsafe {
                 std::ptr::copy_nonoverlapping(
-                    self.name.as_ptr() as *const c_char, 
-                    ifr.ifr_name.as_mut_ptr(), 
-                    self.name.len()
+                    self.name.as_ptr() as *const c_char,
+                    ifr.ifr_name.as_mut_ptr(),
+                    self.name.len(),
                 )
             }
         }
@@ -159,17 +158,19 @@ impl Tun {
 
     fn set_alias(&mut self, addr: Ipv4Addr, broadaddr: Ipv4Addr, mask: Ipv4Addr) -> Result<()> {
         let mut ifar: ifaliasreq = unsafe { mem::zeroed() };
-        unsafe { std::ptr::copy_nonoverlapping(
-            self.name.as_ptr() as *const c_char,
-            ifar.ifra_name.as_mut_ptr(),
-            self.name.len()
-        ) };
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                self.name.as_ptr() as *const c_char,
+                ifar.ifra_name.as_mut_ptr(),
+                self.name.len(),
+            )
+        };
 
         ifar.ifra_addr = addr.to_sockaddr();
         ifar.ifra_broadaddr = broadaddr.to_sockaddr();
         ifar.ifra_mask = mask.to_sockaddr();
 
-        unsafe { siocaifaddr(self.ctl.as_raw_fd() , &ifar) }?;
+        unsafe { siocaifaddr(self.ctl.as_raw_fd(), &ifar) }?;
 
         Ok(())
     }
@@ -225,16 +226,14 @@ impl Interface for Tun {
             unsafe { siocgifflags(self.ctl.as_raw_fd(), &mut ifr) }?;
         }
 
-        Ok(unsafe {ifr.ifr_ifru.ifru_flags} )
+        Ok(unsafe { ifr.ifr_ifru.ifru_flags })
     }
 
     fn address(&self) -> Result<Ipv4Addr> {
         let mut ifr: libc::ifreq = self.ifreq();
         unsafe { siocgifaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
 
-        Ok(Ipv4Addr::from_sockaddr(
-            unsafe { ifr.ifr_ifru.ifru_addr }
-        ))
+        Ok(Ipv4Addr::from_sockaddr(unsafe { ifr.ifr_ifru.ifru_addr }))
     }
     fn set_address(&mut self, addr: Ipv4Addr) -> Result<()> {
         let mut ifr = self.ifreq();
@@ -251,7 +250,7 @@ impl Interface for Tun {
 
         Ok(Ipv4Addr::from_sockaddr(
             // access to union field is unsafe
-            unsafe { ifr.ifr_ifru.ifru_dstaddr  }
+            unsafe { ifr.ifr_ifru.ifru_dstaddr },
         ))
     }
     fn set_destination(&mut self, addr: Ipv4Addr) -> Result<()> {
@@ -259,7 +258,7 @@ impl Interface for Tun {
         ifr.ifr_ifru.ifru_dstaddr = addr.to_sockaddr();
 
         unsafe { siocsifdstaddr(self.ctl.as_raw_fd(), &ifr) }?;
-        
+
         Ok(())
     }
 
@@ -267,16 +266,16 @@ impl Interface for Tun {
         let mut ifr: libc::ifreq = self.ifreq();
         unsafe { siocgifbrdaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
 
-        Ok(Ipv4Addr::from_sockaddr(
-            unsafe { ifr.ifr_ifru.ifru_broadaddr }
-        ))
+        Ok(Ipv4Addr::from_sockaddr(unsafe {
+            ifr.ifr_ifru.ifru_broadaddr
+        }))
     }
     fn set_broadcast(&mut self, addr: Ipv4Addr) -> Result<()> {
         let mut ifr = self.ifreq();
         ifr.ifr_ifru.ifru_broadaddr = addr.to_sockaddr();
 
         unsafe { siocsifbrdaddr(self.ctl.as_raw_fd(), &ifr) }?;
-        
+
         Ok(())
     }
 
@@ -284,9 +283,7 @@ impl Interface for Tun {
         let mut ifr = self.ifreq();
         unsafe { siocgifnetmask(self.ctl.as_raw_fd(), &mut ifr) }?;
 
-        Ok(Ipv4Addr::from_sockaddr(
-            unsafe { ifr.ifr_ifru.ifru_addr }
-        ))
+        Ok(Ipv4Addr::from_sockaddr(unsafe { ifr.ifr_ifru.ifru_addr }))
     }
     fn set_netmask(&mut self, addr: Ipv4Addr) -> Result<()> {
         let mut ifr = self.ifreq();

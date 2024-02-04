@@ -4,12 +4,18 @@ mod linux;
 pub use linux::{Tun, TunConf};
 
 #[cfg(target_os = "macos")]
-mod macos;
+mod macos {
+    mod sys;
+    pub mod tun;
+}
 #[cfg(target_os = "macos")]
-pub use macos::{tun::Tun, TunConf};
+pub use macos::tun::{Tun, TunConf};
 
 #[cfg(unix)]
-pub mod posix;
+pub mod posix {
+    pub mod fd;
+    pub mod sys;
+}
 
 #[cfg(test)]
 mod test {
