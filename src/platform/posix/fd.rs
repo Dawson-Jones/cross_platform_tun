@@ -81,7 +81,7 @@ impl Write for Fd {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        syscall!(fsync( self.0))?;
+        // syscall!(fsync(self.0))?;
 
         Ok(())
     }
