@@ -1,14 +1,13 @@
 use std::io::Read;
 
-
-
-fn main() -> Result<(), Box<dyn std::error::Error>>{
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut dev = cross_platform_tun::Configuration::default()
         .address("10.0.0.9")
         .netmask("255.255.255.0")
         .destination("10.0.0.1")
         .up()
-        .build();
+        .build()
+        .unwrap();
 
     let mut buf = [0u8; 4096];
 

@@ -1,5 +1,8 @@
-use std::{io::{self, Read, Write}, os::fd::{AsRawFd, RawFd}};
 use crate::{error::*, syscall};
+use std::{
+    io::{self, Read, Write},
+    os::fd::{AsRawFd, RawFd},
+};
 
 pub struct Fd(pub RawFd);
 
@@ -13,7 +16,7 @@ impl Fd {
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        let mut now = syscall!( fcntl(self.0, libc::F_GETFL))?;
+        let mut now = syscall!(fcntl(self.0, libc::F_GETFL))?;
 
         if nonblocking {
             now |= libc::O_NONBLOCK;
@@ -33,11 +36,7 @@ impl AsRawFd for Fd {
 
 impl Read for Fd {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = syscall!(read(
-            self.0, 
-            buf.as_mut_ptr() as *mut _, 
-            buf.len()
-        ))?;
+        let n = syscall!(read(self.0, buf.as_mut_ptr() as *mut _, buf.len()))?;
 
         Ok(n as _)
     }
@@ -46,11 +45,7 @@ impl Read for Fd {
         let iov = bufs.as_ptr().cast();
         let iovcnt = bufs.len().min(libc::c_int::MAX as usize) as _;
 
-        let n = syscall!(readv(
-            self.0,
-            iov,
-            iovcnt
-        ))?;
+        let n = syscall!(readv(self.0, iov, iovcnt))?;
 
         Ok(n as _)
     }
@@ -58,11 +53,7 @@ impl Read for Fd {
 
 impl Write for Fd {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let n = syscall!(write(
-            self.0,
-            buf.as_ptr() as *const _,
-            buf.len()
-        ))?;
+        let n = syscall!(write(self.0, buf.as_ptr() as *const _, buf.len()))?;
 
         Ok(n as _)
     }
@@ -71,11 +62,7 @@ impl Write for Fd {
         let iov = bufs.as_ptr().cast();
         let iovcnt = bufs.len().min(libc::c_int::MAX as usize) as _;
 
-        let n = syscall!(writev(
-            self.0,
-            iov,
-            iovcnt
-        ))?;
+        let n = syscall!(writev(self.0, iov, iovcnt))?;
 
         Ok(n as _)
     }

@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut framed = dev.into_framed();
 
     while let Some(packet) = framed.next().await {
-        let pkt = packet?;   
+        let pkt = packet?;
         match ip::Packet::new(pkt.get_bytes()) {
             Ok(ip::Packet::V4(pkt)) => {
                 if let Ok(icmp) = icmp::Packet::new(pkt.payload()) {
@@ -36,12 +36,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .payload(icmp.payload())?
                             .build()?;
 
-                        framed
-                            .send(TunPacket::new(reply))
-                            .await?;
+                        framed.send(TunPacket::new(reply)).await?;
                     }
                 }
-            },
+            }
             Err(err) => println!("received an invalid packet: {:?}", err),
             _ => {}
         }

@@ -3,12 +3,12 @@ use packet::ip::Packet;
 
 #[tokio::main]
 async fn main() {
-    let mut dev = cross_platform_tun::Configuration::default()
+    let dev = cross_platform_tun::Configuration::default()
         .address("192.168.108.1")
         .netmask("255.255.255.0")
         .up()
-        .build_async()?;
-
+        .build_async()
+        .unwrap();
 
     let mut stream = dev.into_framed();
     while let Some(packet) = stream.next().await {

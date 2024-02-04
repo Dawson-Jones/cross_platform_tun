@@ -13,8 +13,7 @@ pub struct ifaliasreq {
     pub ifra_mask: libc::sockaddr,
 }
 
-nix::ioctl_readwrite!(ctliocginfo, b'N', 3, ctl_info);  // /* get id from name */
-
+nix::ioctl_readwrite!(ctliocginfo, b'N', 3, ctl_info); // /* get id from name */
 nix::ioctl_write_ptr!(siocsifflags, b'i', 16, ifreq);
 nix::ioctl_readwrite!(siocgifflags, b'i', 17, ifreq);
 

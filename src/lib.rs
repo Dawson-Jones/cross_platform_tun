@@ -31,4 +31,4 @@ pub mod r#async {
         target_os = "android"
     )
 ))]
-pub use r#async::{tun::AsyncTun, codec::TunPacket};
+pub use r#async::{codec::TunPacket, tun::AsyncTun};

@@ -1,12 +1,8 @@
-use std::io::Result;
-
-use futures::StreamExt;
-use packet::ip::Packet;
 use tokio::io::AsyncReadExt;
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let dev = cross_platform_tun::Configuration::default()
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut dev = cross_platform_tun::Configuration::default()
         .address("192.168.108.1")
         .netmask("255.255.255.0")
         .up()

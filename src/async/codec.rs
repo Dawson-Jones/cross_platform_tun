@@ -92,7 +92,6 @@ impl Decoder for TunPacketCodec {
     }
 }
 
-
 impl Encoder<TunPacket> for TunPacketCodec {
     type Error = io::Error;
 
@@ -110,7 +109,7 @@ impl Encoder<TunPacket> for TunPacketCodec {
 
                 dst.put_slice(&pi);
                 dst.put(pkt);
-            },
+            }
             TunPacket(_, pkt) => dst.put(pkt),
         }
 
