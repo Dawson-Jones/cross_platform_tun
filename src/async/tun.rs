@@ -2,7 +2,7 @@ use std::{io::{self, Read, Write}, task::{ready, Poll}};
 
 use tokio::io::{unix::AsyncFd, AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
-use crate::{interface::Interface, platform::Tun};
+use crate::{error::Result, interface::Interface, platform::Tun};
 
 use super::codec::TunPacketCodec;
 
@@ -11,7 +11,7 @@ pub struct AsyncTun {
 }
 
 impl AsyncTun {
-    pub fn new(tun: Tun) -> io::Result<AsyncTun> {
+    pub fn new(tun: Tun) -> Result<AsyncTun> {
         tun.set_nonblocking()?;
 
         Ok(AsyncTun { 

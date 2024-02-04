@@ -1,9 +1,8 @@
-use std::net::Ipv4Addr;
-use crate::error::*;
 use crate::configuration::Configuration;
+use crate::error::*;
+use std::net::Ipv4Addr;
 
-
-pub trait Interface/*: Read + Write*/ {
+pub trait Interface /*: Read + Write*/ {
     // type Queue: Read + Write;
     type Queue;
 
@@ -48,7 +47,7 @@ pub trait Interface/*: Read + Write*/ {
 
     fn broadcast(&self) -> Result<Ipv4Addr>;
     fn set_broadcast(&mut self, addr: Ipv4Addr) -> Result<()>;
-    
+
     fn netmask(&self) -> Result<Ipv4Addr>;
     fn set_netmask(&mut self, addr: Ipv4Addr) -> Result<()>;
 

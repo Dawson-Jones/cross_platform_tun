@@ -6,8 +6,6 @@ mod error;
 mod interface;
 
 mod platform;
-pub use platform::create;
-
 
 #[cfg(all(
     feature = "async",
@@ -30,4 +28,4 @@ mod r#async;
         target_os = "android"
     )
 ))]
-pub use r#async::{create_as_async, TunPacket};
+pub use r#async::{AsyncTun, TunPacket};

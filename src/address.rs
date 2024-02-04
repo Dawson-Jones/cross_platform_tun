@@ -1,5 +1,4 @@
-use std::{net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4}};
-
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use crate::error::{Error, Result};
 
@@ -84,7 +83,6 @@ impl IntoIpv4Addr for SocketAddr {
         }
     }
 }
-
 
 pub trait Ipv4AddrExt {
     fn to_sockaddr(&self) -> libc::sockaddr;

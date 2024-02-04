@@ -1,5 +1,3 @@
-mod fd;
-pub use fd::Fd;
-
+pub mod fd;
 pub mod sys;
 

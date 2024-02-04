@@ -7,7 +7,7 @@ use libc::{c_char, c_uchar, c_uint, socklen_t, AF_SYS_CONTROL, IFNAMSIZ};
 use crate::address::Ipv4AddrExt;
 use crate::configuration::Layer;
 use crate::interface::Interface;
-use crate::platform::posix::Fd;
+use crate::platform::posix::fd::Fd;
 use crate::{error::*, syscall};
 use crate::{configuration::Configuration, error::Error};
 

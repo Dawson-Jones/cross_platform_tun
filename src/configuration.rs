@@ -1,4 +1,4 @@
-use std::{net::Ipv4Addr};
+use std::net::Ipv4Addr;
 
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
@@ -6,7 +6,9 @@ use std::os::unix::io::RawFd;
 use std::os::windows::raw::HANDLE;
 
 use crate::address::IntoIpv4Addr;
-use crate::platform;
+use crate::error::Result;
+use crate::platform::{self, Tun};
+use crate::AsyncTun;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Layer {
@@ -34,7 +36,7 @@ pub struct Configuration {
     #[cfg(not(unix))]
     pub(crate) raw_fd: Option<i32>,
     #[cfg(windows)]
-    pub(crate) raw_handle: Option<HANDLE>
+    pub(crate) raw_handle: Option<HANDLE>,
 }
 
 impl Configuration {
@@ -107,5 +109,14 @@ impl Configuration {
     pub fn raw_handle(&mut self, handle: HANDLE) -> &mut Self {
         self.raw_handle = Some(handle);
         self
+    }
+
+    pub fn build(&self) -> Result<Tun> {
+        Tun::new(self)
+    }
+
+    #[cfg(feature = "async")]
+    pub fn build_async(&self) -> Result<AsyncTun> {
+        AsyncTun::new(Tun::new(self)?)
     }
 }

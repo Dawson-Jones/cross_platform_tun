@@ -6,14 +6,13 @@ use packet::{icmp, ip, Builder, Packet};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut config = Configuration::default();
-    config
+    let dev = Configuration::default()
         .address("192.168.108.2")
         .netmask("255.255.255.0")
         .destination("192.168.108.2")
-        .up();
+        .up()
+        .build_async()?;
 
-    let dev = cross_platform_tun::create_as_async(&config)?;
     let mut framed = dev.into_framed();
 
     while let Some(packet) = framed.next().await {

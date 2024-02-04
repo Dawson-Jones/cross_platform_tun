@@ -6,13 +6,12 @@ use tokio::io::AsyncReadExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut config = cross_platform_tun::Configuration::default();
-    config
+    let dev = cross_platform_tun::Configuration::default()
         .address("192.168.108.1")
         .netmask("255.255.255.0")
-        .up();
+        .up()
+        .build_async()?;
 
-    let mut dev = cross_platform_tun::create_as_async(&config).unwrap();
     let mut buf = [0; 4096];
     loop {
         let n = dev.read(&mut buf[..]).await?;
