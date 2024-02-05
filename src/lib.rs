@@ -1,5 +1,4 @@
-mod configuration;
-pub use configuration::Configuration;
+pub mod configuration;
 
 mod address;
 mod error;

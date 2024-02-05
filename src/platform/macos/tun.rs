@@ -143,15 +143,13 @@ impl Tun {
     fn ifreq(&self) -> libc::ifreq {
         let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
 
-        if !self.name.is_empty() {
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    self.name.as_ptr() as *const c_char,
-                    ifr.ifr_name.as_mut_ptr(),
-                    self.name.len(),
-                )
-            }
-        }
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                self.name.as_ptr() as *const c_char,
+                ifr.ifr_name.as_mut_ptr(),
+                self.name.len(),
+            )
+        };
 
         ifr
     }
@@ -214,7 +212,9 @@ impl Interface for Tun {
             flags &= !(libc::IFF_UP as i16);
         }
 
-        self.flags(Some(flags)).and(Ok(()))
+        self.flags(Some(flags))?;
+
+        Ok(())
     }
     fn flags(&self, flags: Option<i16>) -> Result<i16> {
         let mut ifr = self.ifreq();

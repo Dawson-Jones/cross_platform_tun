@@ -36,6 +36,18 @@ impl PacketProtocol {
             )),
         }
     }
+
+    #[cfg(any(target_os = "linux". target_os = "android"))]
+    fn into_pi_field(self) -> Result<u16, io::Error> {
+        match self {
+            PacketProtocol::Ipv4 => Ok(libc::ETH_P_IP as u16),
+            PacketProtocol::Ipv6 => Ok(libc::ETH_P_IPV6 as u16),
+            PacketProtocol::Other(p) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("neither an Ipv4 nor Ipv6 packet: {p}"),
+            )),
+        }
+    }
 }
 
 pub struct TunPacket(PacketProtocol, Bytes);

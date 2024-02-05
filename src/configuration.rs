@@ -8,6 +8,7 @@ use std::os::windows::raw::HANDLE;
 use crate::address::IntoIpv4Addr;
 use crate::error::Result;
 use crate::platform::{self, Tun};
+#[cfg(feature = "async")]
 use crate::AsyncTun;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

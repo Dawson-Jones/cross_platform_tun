@@ -1,7 +1,10 @@
 #[cfg(target_os = "linux")]
-mod linux;
+mod linux {
+    mod sys;
+    pub mod tun;
+}
 #[cfg(target_os = "linux")]
-pub use linux::{Tun, TunConf};
+pub use linux::tun::{Tun, TunConf};
 
 #[cfg(target_os = "macos")]
 mod macos {
