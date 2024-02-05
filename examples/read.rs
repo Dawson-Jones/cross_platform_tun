@@ -2,7 +2,9 @@ use std::io::Read;
 use cross_platform_tun::configuration::Configuration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Configuration::default()
+    let mut config = Configuration::default();
+
+    config
         .address("10.0.0.9")
         .netmask("255.255.255.0")
         .destination("10.0.0.1")
@@ -10,12 +12,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     let config = config.platform(|tun_conf| {
-        tun_conf.packet_information(ture)
+        tun_conf.packet_information(true);
     });
 
-    let dev = config.build().unwrap();
-
+    let mut dev = config.build().unwrap();
     let mut buf = [0u8; 4096];
+
     loop {
         let n = dev.read(&mut buf)?;
         println!("read {} bytes", n);

@@ -28,13 +28,22 @@ mod test {
 
     #[test]
     fn create() {
-        let dev = Configuration::default()
+        let mut config= Configuration::default();
+
+        config
             .address("192.168.50.1")
             .netmask("255.255.255.0")
             .mtu(1400)
-            .up()
+            .up();
+
+        #[cfg(target_os = "linux")]
+        config.name("tun9");
+        let dev = config
             .build()
             .unwrap();
+
+        #[cfg(target_os = "linux")]
+        assert_eq!("tun9", dev.name().unwrap());
 
         assert_eq!(
             "192.168.50.1".parse::<Ipv4Addr>().unwrap(),

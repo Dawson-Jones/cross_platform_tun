@@ -57,32 +57,19 @@ pub struct Tun {
 
 impl Tun {
     pub fn new(config: &Configuration) -> Result<Self> {
-        // TODO: copy name same as macos
-        let name = match config.name.as_ref() {
-            Some(name) => {
-                let name = CString::new(name.clone())?;
-
-                if name.as_bytes_with_nul().len() > IFNAMSIZ {
-                    return Err(Error::NameTooLong);
-                }
-
-                Some(name)
-            }
-            None => None,
-        };
-
         let mut queues = Vec::new();
         let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
 
-        if let Some(name) = name.as_ref() {
+        if let Some(name) = config.name.as_ref() {
             unsafe {
                 std::ptr::copy_nonoverlapping(
                     name.as_ptr() as *const _,
                     ifr.ifr_name.as_mut_ptr(),
-                    name.as_bytes().len(),
+                    name.len(),
                 )
-            };
-        }
+            }
+        };
+
 
         let tun_type: c_short = config.layer.into();
         let queue_nums = config.queues.unwrap_or(1);
@@ -172,7 +159,7 @@ impl Interface for Tun {
         unsafe {
             std::ptr::copy_nonoverlapping(
                 new_name.as_ptr() as *const _,
-                ifr.ifr_name.as_mut_ptr(),
+                ifr.ifr_ifru.ifru_newname.as_mut_ptr(),
                 new_name.len(),
             )
         }
@@ -306,6 +293,12 @@ impl Interface for Tun {
 impl AsRawFd for Tun {
     fn as_raw_fd(&self) -> RawFd {
         self.queues[0].as_raw_fd()
+    }
+}
+
+impl Read for Tun {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.queues[0].tun.read(buf)
     }
 }
 
