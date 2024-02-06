@@ -196,7 +196,7 @@ impl Interface for Tun {
     type Queue = Queue;
 
     fn name(&self) -> Result<&str> {
-        Ok(&self.name)
+        Ok(self.name.clone())
     }
     // can not set interface name on Darwin
     fn set_name(&mut self, _name: &str) -> Result<()> {
@@ -310,12 +310,8 @@ impl Interface for Tun {
         Ok(())
     }
 
-    fn queue(&mut self, index: usize) -> Option<&mut Self::Queue> {
-        if index > 0 {
-            return None;
-        }
-
-        Some(&mut self.queue)
+    fn queue(&mut self) -> &mut Self::Queue {
+        &mut self.queue
     }
 }
 

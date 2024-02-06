@@ -32,7 +32,7 @@ pub trait Interface /*: Read + Write*/ {
         Ok(())
     }
 
-    fn name(&self) -> Result<&str>;
+    fn name(&self) -> Result<String>;
     fn set_name(&mut self, name: &str) -> Result<()>;
 
     fn enable(&mut self, value: bool) -> Result<()>;
@@ -54,5 +54,5 @@ pub trait Interface /*: Read + Write*/ {
     fn mtu(&self) -> Result<i32>;
     fn set_mtu(&mut self, mtu: i32) -> Result<()>;
 
-    fn queue(&mut self, index: usize) -> Option<&mut Self::Queue>;
+    fn queue(&mut self) -> &mut Self::Queue;
 }

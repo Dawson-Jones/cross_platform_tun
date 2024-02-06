@@ -6,7 +6,7 @@ use std::os::unix::io::RawFd;
 use std::os::windows::raw::HANDLE;
 
 use crate::address::IntoIpv4Addr;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::platform::{self, Tun};
 #[cfg(feature = "async")]
 use crate::AsyncTun;
@@ -113,7 +113,17 @@ impl Configuration {
     }
 
     pub fn build(&self) -> Result<Tun> {
-        Tun::new(self)
+        match self.queues {
+            Some(n) if n > 1 => {
+                Err(Error::InvalidConfig)
+            }
+            _ => Tun::new(self)
+        }
+    }
+
+    #[cfg(linux)]
+    pub fn build_multi_queue(&self) -> Result<Vec<Tun>> {
+        Tun::new_multi_queue(self)
     }
 
     #[cfg(feature = "async")]

@@ -9,7 +9,11 @@ use crate::{
 };
 use libc::{c_int, c_short, IFNAMSIZ};
 use std::{
-    ffi::{CStr, CString}, io::{self, Read}, net::Ipv4Addr, os::fd::{AsRawFd, RawFd}
+    ffi::CStr,
+    io::{self, Read},
+    net::Ipv4Addr,
+    os::fd::{AsRawFd, RawFd},
+    sync::{Arc, Mutex},
 };
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -50,14 +54,24 @@ impl AsRawFd for Queue {
 }
 
 pub struct Tun {
-    name: String,
-    queues: Vec<Queue>,
-    ctl: Fd,
+    name: Arc<Mutex<String>>,
+    queue: Queue,
+    ctl: Arc<Mutex<Fd>>,
 }
 
 impl Tun {
     pub fn new(config: &Configuration) -> Result<Self> {
-        let mut queues = Vec::new();
+        let tun = Tun::new_multi_queue(config)?.pop().unwrap();
+        Ok(tun)
+    }
+
+    pub fn new_multi_queue(config: &Configuration) -> Result<Vec<Self>> {
+        let ctl_fd = syscall!(socket(libc::AF_INET, libc::SOCK_DGRAM, 0))?;
+        let ctl = Fd::new(ctl_fd)?;
+        let ctl = Arc::new(Mutex::new(ctl));
+        let name = Arc::new(Mutex::new(String::new()));
+
+        let mut tuns = Vec::new();
         let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
 
         if let Some(name) = config.name.as_ref() {
@@ -69,7 +83,6 @@ impl Tun {
                 )
             }
         };
-
 
         let tun_type: c_short = config.layer.into();
         let queue_nums = config.queues.unwrap_or(1);
@@ -91,34 +104,38 @@ impl Tun {
 
             unsafe { tunsetiff(tun_fd, &mut ifr as *mut libc::ifreq as *mut c_int) }?;
 
-            queues.push(Queue {
+            let queue = Queue {
                 tun: Fd::new(tun_fd)?,
                 pi_enabled: pi,
-            });
+            };
+            let tun = Self {
+                name: name.clone(),
+                queue,
+                ctl: ctl.clone(),
+            };
+            tuns.push(tun);
         }
-
-        let ctl_fd = syscall!(socket(libc::AF_INET, libc::SOCK_DGRAM, 0))?;
-        let ctl = Fd::new(ctl_fd)?;
 
         let name = unsafe {
             CStr::from_ptr(ifr.ifr_name.as_ptr())
                 .to_string_lossy()
                 .to_string()
         };
-        let mut tun = Self { name, queues, ctl };
-        tun.configure(config)?;
+        *tuns[0].name.lock().unwrap() = name;
 
-        Ok(tun)
+        tuns[0].configure(config)?;
+
+        Ok(tuns)
     }
 
     fn ifreq(&self) -> libc::ifreq {
         let mut ifr: libc::ifreq = unsafe { std::mem::zeroed() };
-
+        let name = self.name.lock().unwrap();
         unsafe {
             std::ptr::copy_nonoverlapping(
-                self.name.as_ptr() as *const _,
+                name.as_ptr() as *const _,
                 ifr.ifr_name.as_mut_ptr(),
-                self.name.len(),
+                name.len(),
             )
         };
 
@@ -126,23 +143,23 @@ impl Tun {
     }
 
     pub fn set_nonblocking(&self) -> io::Result<()> {
-        // self.queues[0].set_nonblocking()
-        for queue in &self.queues {
-            queue.set_nonblocking()?;
-        }
-        Ok(())
+        self.queue.set_nonblocking()
+    }
+
+    pub fn cancel_nonblocking(&self) -> io::Result<()> {
+        self.queue.cancel_nonblocking()
     }
 
     pub fn has_packet_information(&self) -> bool {
-        self.queues[0].has_packet_information()
+        self.queue.has_packet_information()
     }
 }
 
 impl Interface for Tun {
     type Queue = Queue;
 
-    fn name(&self) -> Result<&str> {
-        Ok(&self.name)
+    fn name(&self) -> Result<String> {
+        Ok(self.name.lock().unwrap().clone())
     }
 
     fn set_name(&mut self, new_name: &str) -> Result<()> {
@@ -164,9 +181,9 @@ impl Interface for Tun {
             )
         }
 
-        unsafe { siocsifname(self.ctl.as_raw_fd(), &ifr) }?;
+        unsafe { siocsifname(self.ctl.lock().unwrap().as_raw_fd(), &ifr) }?;
 
-        self.name = new_name.into();
+        *self.name.lock().unwrap() = new_name.into();
 
         Ok(())
     }
@@ -190,9 +207,9 @@ impl Interface for Tun {
 
         if let Some(flags) = flags {
             ifr.ifr_ifru.ifru_flags = flags;
-            unsafe { siocsifflags(self.ctl.as_raw_fd(), &ifr) }?;
+            unsafe { siocsifflags(self.ctl.lock().unwrap().as_raw_fd(), &ifr) }?;
         } else {
-            unsafe { siocgifflags(self.ctl.as_raw_fd(), &mut ifr) }?;
+            unsafe { siocgifflags(self.ctl.lock().unwrap().as_raw_fd(), &mut ifr) }?;
         }
 
         Ok(unsafe { ifr.ifr_ifru.ifru_flags })
@@ -201,7 +218,7 @@ impl Interface for Tun {
     fn address(&self) -> Result<Ipv4Addr> {
         let mut ifr = self.ifreq();
 
-        unsafe { siocgifaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
+        unsafe { siocgifaddr(self.ctl.lock().unwrap().as_raw_fd(), &mut ifr) }?;
 
         // Ok(Ipv4Addr::from_sockaddr(unsafe { ifr.ifr_ifru.ifru_addr }))
         Ok(unsafe { ifr.ifr_ifru.ifru_addr }.into_ipv4addr())
@@ -211,7 +228,7 @@ impl Interface for Tun {
         let mut ifr = self.ifreq();
         ifr.ifr_ifru.ifru_addr = addr.to_sockaddr();
 
-        unsafe { siocsifaddr(self.ctl.as_raw_fd(), &ifr) }?;
+        unsafe { siocsifaddr(self.ctl.lock().unwrap().as_raw_fd(), &ifr) }?;
 
         Ok(())
     }
@@ -219,7 +236,7 @@ impl Interface for Tun {
     fn destination(&self) -> Result<std::net::Ipv4Addr> {
         let mut ifr = self.ifreq();
 
-        unsafe { siocgifdstaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
+        unsafe { siocgifdstaddr(self.ctl.lock().unwrap().as_raw_fd(), &mut ifr) }?;
 
         Ok(unsafe { ifr.ifr_ifru.ifru_addr }.into_ipv4addr())
     }
@@ -228,7 +245,7 @@ impl Interface for Tun {
         let mut ifr = self.ifreq();
         ifr.ifr_ifru.ifru_addr = addr.to_sockaddr();
 
-        unsafe { siocsifdstaddr(self.ctl.as_raw_fd(), &ifr) }?;
+        unsafe { siocsifdstaddr(self.ctl.lock().unwrap().as_raw_fd(), &ifr) }?;
 
         Ok(())
     }
@@ -236,7 +253,7 @@ impl Interface for Tun {
     fn broadcast(&self) -> Result<std::net::Ipv4Addr> {
         let mut ifr = self.ifreq();
 
-        unsafe { siocgifbrdaddr(self.ctl.as_raw_fd(), &mut ifr) }?;
+        unsafe { siocgifbrdaddr(self.ctl.lock().unwrap().as_raw_fd(), &mut ifr) }?;
 
         Ok(unsafe { ifr.ifr_ifru.ifru_addr }.into_ipv4addr())
     }
@@ -245,7 +262,7 @@ impl Interface for Tun {
         let mut ifr = self.ifreq();
         ifr.ifr_ifru.ifru_addr = addr.to_sockaddr();
 
-        unsafe { siocsifbrdaddr(self.ctl.as_raw_fd(), &ifr) }?;
+        unsafe { siocsifbrdaddr(self.ctl.lock().unwrap().as_raw_fd(), &ifr) }?;
 
         Ok(())
     }
@@ -253,7 +270,7 @@ impl Interface for Tun {
     fn netmask(&self) -> Result<std::net::Ipv4Addr> {
         let mut ifr = self.ifreq();
 
-        unsafe { siocgifnetmask(self.ctl.as_raw_fd(), &mut ifr) }?;
+        unsafe { siocgifnetmask(self.ctl.lock().unwrap().as_raw_fd(), &mut ifr) }?;
 
         Ok(unsafe { ifr.ifr_ifru.ifru_addr }.into_ipv4addr())
     }
@@ -262,7 +279,7 @@ impl Interface for Tun {
         let mut ifr = self.ifreq();
         ifr.ifr_ifru.ifru_addr = addr.to_sockaddr();
 
-        unsafe { siocsifnetmask(self.ctl.as_raw_fd(), &ifr) }?;
+        unsafe { siocsifnetmask(self.ctl.lock().unwrap().as_raw_fd(), &ifr) }?;
 
         Ok(())
     }
@@ -270,7 +287,7 @@ impl Interface for Tun {
     fn mtu(&self) -> Result<i32> {
         let mut ifr = self.ifreq();
 
-        unsafe { siocgifmtu(self.ctl.as_raw_fd(), &mut ifr) }?;
+        unsafe { siocgifmtu(self.ctl.lock().unwrap().as_raw_fd(), &mut ifr) }?;
 
         Ok(unsafe { ifr.ifr_ifru.ifru_mtu })
     }
@@ -279,29 +296,27 @@ impl Interface for Tun {
         let mut ifr = self.ifreq();
         ifr.ifr_ifru.ifru_mtu = mtu;
 
-        unsafe { siocsifmtu(self.ctl.as_raw_fd(), &ifr) }?;
+        unsafe { siocsifmtu(self.ctl.lock().unwrap().as_raw_fd(), &ifr) }?;
 
         Ok(())
     }
 
-    fn queue(&mut self, index: usize) -> Option<&mut Self::Queue> {
-        self.queues.get_mut(index)
+    fn queue(&mut self) -> &mut Self::Queue {
+        &mut self.queue
     }
 }
 
-
 impl AsRawFd for Tun {
     fn as_raw_fd(&self) -> RawFd {
-        self.queues[0].as_raw_fd()
+        self.queue.as_raw_fd()
     }
 }
 
 impl Read for Tun {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.queues[0].tun.read(buf)
+        self.queue.tun.read(buf)
     }
 }
-
 
 impl From<Layer> for c_short {
     fn from(value: Layer) -> Self {
