@@ -121,7 +121,7 @@ impl Configuration {
         }
     }
 
-    #[cfg(linux)]
+    #[cfg(target_os = "linux")]
     pub fn build_multi_queue(&self) -> Result<Vec<Tun>> {
         Tun::new_multi_queue(self)
     }
