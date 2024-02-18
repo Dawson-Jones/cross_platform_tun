@@ -1,9 +1,8 @@
-use std::{
-    io::{self, Read, Write},
-    task::{ready, Poll},
-};
+use std::task::{ready, Poll};
+use std::io::{self, Read, Write};
 
-use crate::{error::Result, interface::Interface, platform::Tun};
+use crate::interface::Interface;
+use crate::{error::Result, tun::Tun};
 use tokio::io::{unix::AsyncFd, AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
 

@@ -7,7 +7,7 @@ use std::os::windows::raw::HANDLE;
 
 use crate::address::IntoIpv4Addr;
 use crate::error::{Error, Result};
-use crate::platform::{self, Tun};
+use crate::tun::{Tun, TunConf};
 #[cfg(feature = "async")]
 use crate::AsyncTun;
 
@@ -21,7 +21,7 @@ pub enum Layer {
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     pub(crate) name: Option<String>,
-    pub(crate) platform: platform::TunConf,
+    pub(crate) platform: TunConf,
 
     pub(crate) address: Option<Ipv4Addr>,
     pub(crate) destnation: Option<Ipv4Addr>,
@@ -41,7 +41,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn platform<F: FnOnce(&mut platform::TunConf)>(&mut self, f: F) -> &mut Self {
+    pub fn platform<F: FnOnce(&mut TunConf)>(&mut self, f: F) -> &mut Self {
         f(&mut self.platform);
         self
     }

@@ -1,5 +1,5 @@
 use std::io::Read;
-use cross_platform_tun::configuration::Configuration;
+use cross_platform_tun::Configuration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = Configuration::default();

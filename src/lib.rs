@@ -1,10 +1,12 @@
-pub mod configuration;
+mod configuration;
+pub use configuration::Configuration;
 
 mod address;
 mod error;
 mod interface;
 
 mod platform;
+pub use platform::tun;
 
 #[cfg(all(
     feature = "async",
@@ -16,7 +18,7 @@ mod platform;
         target_os = "android"
     )
 ))]
-pub mod r#async {
+mod r#async {
     pub mod codec;
     pub mod tun;
 }
@@ -30,4 +32,4 @@ pub mod r#async {
         target_os = "android"
     )
 ))]
-pub use r#async::{codec::TunPacket, tun::AsyncTun};
+pub use r#async::{codec::TunPacket, codec::TunPacketCodec, tun::AsyncTun};

@@ -4,7 +4,7 @@ mod linux {
     pub mod tun;
 }
 #[cfg(target_os = "linux")]
-pub use linux::tun::{Tun, TunConf};
+pub use linux::tun;
 
 #[cfg(target_os = "macos")]
 mod macos {
@@ -12,7 +12,7 @@ mod macos {
     pub mod tun;
 }
 #[cfg(target_os = "macos")]
-pub use macos::tun::{Tun, TunConf};
+pub use macos::tun;
 
 #[cfg(unix)]
 pub(crate) mod posix {
