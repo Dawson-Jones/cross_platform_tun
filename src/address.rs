@@ -94,7 +94,8 @@ pub trait SockAddrExt<T> {
 }
 
 impl<T> SockAddrExt<T> for libc::sockaddr
-where T: Ipv4AddrExt
+where
+    T: Ipv4AddrExt,
 {
     fn into_ipv4addr(self) -> T {
         T::from_sockaddr(self)

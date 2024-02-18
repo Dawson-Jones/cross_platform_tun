@@ -1,5 +1,5 @@
-use std::io::Read;
 use cross_platform_tun::configuration::Configuration;
+use std::io::Read;
 
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut threads: Vec<thread::JoinHandle<Result<(), io::Error>>> = Vec::new();
     for (number, mut tun) in tuns.into_iter().enumerate() {
-        let t = thread::spawn(move ||->io::Result<()> {
+        let t = thread::spawn(move || -> io::Result<()> {
             let mut buf = [0u8; 4096];
             loop {
                 let n = tun.read(&mut buf)?;
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
         threads.push(t);
-    };
+    }
 
     for t in threads {
         let _ = t.join().unwrap();

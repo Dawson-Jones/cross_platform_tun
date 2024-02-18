@@ -22,6 +22,10 @@ impl AsyncTun {
         })
     }
 
+    pub fn new_multi_queue(tuns: Vec<Tun>) -> Result<Vec<AsyncTun>> {
+        tuns.into_iter().map(AsyncTun::new).collect()
+    }
+
     fn get_mut(&mut self) -> &mut Tun {
         self.inner.get_mut()
     }
@@ -61,7 +65,8 @@ impl AsyncWrite for AsyncTun {
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         loop {
-            let mut guard = ready!(self
+            let mut guard = ready!(
+                self
                 // .get_mut()
                 .inner
                 .poll_write_ready_mut(cx)
@@ -79,7 +84,8 @@ impl AsyncWrite for AsyncTun {
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Result<(), io::Error>> {
         loop {
-            let mut guard = ready!(self
+            let mut guard = ready!(
+                self
                 // .get_mut()
                 .inner
                 .poll_write_ready_mut(cx)

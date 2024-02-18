@@ -1,4 +1,3 @@
-use super::sys::*;
 use crate::{
     address::{Ipv4AddrExt, SockAddrExt},
     configuration::{Configuration, Layer},
@@ -10,11 +9,13 @@ use crate::{
 use libc::{c_int, c_short, IFNAMSIZ};
 use std::{
     ffi::CStr,
-    io::{self, Read},
+    io::{self, Read, Write},
     net::Ipv4Addr,
     os::fd::{AsRawFd, RawFd},
     sync::{Arc, Mutex},
 };
+
+use super::sys::*;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TunConf {
@@ -315,6 +316,24 @@ impl AsRawFd for Tun {
 impl Read for Tun {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.queue.tun.read(buf)
+    }
+
+    fn read_vectored(&mut self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
+        self.queue.tun.read_vectored(bufs)
+    }
+}
+
+impl Write for Tun {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.queue.tun.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.queue.tun.flush()
+    }
+
+    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        self.queue.tun.write_vectored(bufs)
     }
 }
 

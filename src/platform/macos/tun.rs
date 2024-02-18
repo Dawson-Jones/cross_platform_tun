@@ -319,6 +319,10 @@ impl Read for Tun {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.queue.tun.read(buf)
     }
+
+    fn read_vectored(&mut self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
+        self.queue.tun.read_vectored(bufs)
+    }
 }
 
 impl Write for Tun {

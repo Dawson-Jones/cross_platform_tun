@@ -114,10 +114,8 @@ impl Configuration {
 
     pub fn build(&self) -> Result<Tun> {
         match self.queues {
-            Some(n) if n > 1 => {
-                Err(Error::InvalidConfig)
-            }
-            _ => Tun::new(self)
+            Some(n) if n > 1 => Err(Error::InvalidConfig),
+            _ => Tun::new(self),
         }
     }
 
@@ -129,5 +127,10 @@ impl Configuration {
     #[cfg(feature = "async")]
     pub fn build_async(&self) -> Result<AsyncTun> {
         AsyncTun::new(Tun::new(self)?)
+    }
+
+    #[cfg(feature = "async")]
+    pub fn build_async_multi_queue(&self) -> Result<Vec<AsyncTun>> {
+        AsyncTun::new_multi_queue(Tun::new_multi_queue(self)?)
     }
 }

@@ -4,7 +4,7 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
-pub struct Fd(pub RawFd);
+pub(crate) struct Fd(pub RawFd);
 
 impl Fd {
     pub fn new(fd: RawFd) -> Result<Self> {

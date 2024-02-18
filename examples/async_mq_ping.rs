@@ -1,27 +1,18 @@
-use cross_platform_tun::{configuration::Configuration, TunPacket};
+use cross_platform_tun::{r#async::codec::TunPacketCodec, configuration::Configuration, AsyncTun, TunPacket};
 use futures::{SinkExt, StreamExt};
 use packet::{icmp, ip, Builder, Packet};
+use tokio_util::codec::Framed;
 
-// sudo route -q -n add -inet 192.168.108.0/24 -interface utun8
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dev = Configuration::default()
-        .address("192.168.108.2")
-        .netmask("255.255.255.0")
-        .destination("192.168.108.1")
-        .up()
-        .build_async()?;
-
-    let mut framed = dev.into_framed();
-
+async fn reply_ping(number: usize, mut framed: Framed<AsyncTun, TunPacketCodec>) -> Result<(), Box<dyn std::error::Error>>{
     while let Some(packet) = framed.next().await {
         let pkt = packet?;
+
         match ip::Packet::new(pkt.get_bytes()) {
             Ok(ip::Packet::V4(pkt)) => {
                 if let Ok(icmp) = icmp::Packet::new(pkt.payload()) {
                     if let Ok(icmp) = icmp.echo() {
-                        println!("{:?} - {:?}", icmp.sequence(), pkt.destination());
+                        println!("mq: {}, {:?} - {:?}", number, icmp.sequence(), pkt.destination());
 
                         let reply = ip::v4::Builder::default()
                             .id(0x42)?
@@ -44,5 +35,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => {}
         }
     }
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let queues = Configuration::default()
+        .address("192.168.108.2")
+        .netmask("255.255.255.0")
+        .destination("192.168.108.1")
+        .queues(2)
+        .up()
+        .build_async_multi_queue()?;
+
+    let mut conroutines = Vec::new();
+    for (idx, dev) in queues.into_iter().enumerate() {
+        let framed = dev.into_framed();
+
+        let cr = tokio::spawn(async move {
+            reply_ping(idx, framed).await.unwrap();
+        });
+
+        conroutines.push(cr);
+    }
+
+    println!("{} conroutines running...", conroutines.len());
+    futures::future::join_all(conroutines).await;
+
     Ok(())
 }

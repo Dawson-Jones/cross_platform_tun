@@ -15,7 +15,7 @@ mod macos {
 pub use macos::tun::{Tun, TunConf};
 
 #[cfg(unix)]
-pub mod posix {
+pub(crate) mod posix {
     pub mod fd;
     pub mod sys;
 }
@@ -29,7 +29,7 @@ mod test {
     #[test]
     #[cfg(target_os = "linux")]
     fn create_for_linux() {
-        let mut config= Configuration::default();
+        let mut config = Configuration::default();
 
         let mut dev = config
             .name("tun0")
@@ -61,7 +61,7 @@ mod test {
 
     #[test]
     fn create() {
-        let mut config= Configuration::default();
+        let mut config = Configuration::default();
 
         let dev = config
             .name("utun6")

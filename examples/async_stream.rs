@@ -1,9 +1,10 @@
+use cross_platform_tun::configuration::Configuration;
 use futures::StreamExt;
 use packet::ip::Packet;
 
 #[tokio::main]
 async fn main() {
-    let dev = cross_platform_tun::Configuration::default()
+    let dev = Configuration::default()
         .address("192.168.108.1")
         .netmask("255.255.255.0")
         .up()
