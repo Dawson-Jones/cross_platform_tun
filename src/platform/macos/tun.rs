@@ -195,7 +195,7 @@ impl AsRawFd for Tun {
 impl Interface for Tun {
     type Queue = Queue;
 
-    fn name(&self) -> Result<&str> {
+    fn name(&self) -> Result<String> {
         Ok(self.name.clone())
     }
     // can not set interface name on Darwin

@@ -130,6 +130,7 @@ impl Configuration {
     }
 
     #[cfg(feature = "async")]
+    #[cfg(target_os = "linux")]
     pub fn build_async_multi_queue(&self) -> Result<Vec<AsyncTun>> {
         AsyncTun::new_multi_queue(Tun::new_multi_queue(self)?)
     }
