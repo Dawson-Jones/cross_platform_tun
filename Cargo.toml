@@ -1,6 +1,6 @@
 [package]
 name = "cross_platform_tun"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 license = "MIT"
@@ -31,7 +31,7 @@ async = ["tokio", "tokio-util", "bytes", "byteorder"]
 default = ["async"]
 
 [dev-dependencies]
-tokio = {version = "1", features = ["full"]}
+tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 packet = "0.1"
 

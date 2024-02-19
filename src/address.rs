@@ -18,6 +18,12 @@ impl IntoIpv4Addr for i32 {
     }
 }
 
+impl IntoIpv4Addr for (u8, u8, u8, u8) {
+    fn into_ipv4(&self) -> Result<Ipv4Addr> {
+        Ok(Ipv4Addr::new(self.0, self.1, self.2, self.3))
+    }
+}
+
 impl IntoIpv4Addr for str {
     fn into_ipv4(&self) -> Result<Ipv4Addr> {
         self.parse().map_err(|_| Error::InvalidAddress)
@@ -33,6 +39,12 @@ impl IntoIpv4Addr for &str {
 impl IntoIpv4Addr for String {
     fn into_ipv4(&self) -> Result<Ipv4Addr> {
         self.as_str().into_ipv4()
+    }
+}
+
+impl IntoIpv4Addr for &String {
+    fn into_ipv4(&self) -> Result<Ipv4Addr> {
+        (**self).into_ipv4()
     }
 }
 
