@@ -1,5 +1,5 @@
-use std::task::{ready, Poll};
 use std::io::{self, Read, Write};
+use std::task::{ready, Poll};
 
 use crate::interface::Interface;
 use crate::{error::Result, tun::Tun};
@@ -39,15 +39,13 @@ impl AsyncTun {
 
 impl AsyncRead for AsyncTun {
     fn poll_read(
-        mut self: std::pin::Pin<&mut Self>,
+        self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<io::Result<()>> {
+        let self_mut = self.get_mut();
         loop {
-            let mut guard = ready!(self
-                // .get_mut()
-                .inner
-                .poll_read_ready_mut(cx))?;
+            let mut guard = ready!(self_mut.inner.poll_read_ready_mut(cx))?;
             let rbuf = buf.initialize_unfilled();
             match guard.try_io(|inner| inner.get_mut().read(rbuf)) {
                 Ok(res) => return Poll::Ready(res.map(|n| buf.advance(n))),
@@ -59,40 +57,32 @@ impl AsyncRead for AsyncTun {
 
 impl AsyncWrite for AsyncTun {
     fn poll_write(
-        mut self: std::pin::Pin<&mut Self>,
+        self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
+        let self_mut = self.get_mut();
         loop {
-            let mut guard = ready!(
-                self
-                // .get_mut()
-                .inner
-                .poll_write_ready_mut(cx)
-            )?;
+            let mut guard = ready!(self_mut.inner.poll_write_ready_mut(cx))?;
 
             match guard.try_io(|inner| inner.get_mut().write(buf)) {
                 Ok(res) => return Poll::Ready(res),
-                Err(_wb) => continue,
+                Err(_would_block) => continue,
             }
         }
     }
 
     fn poll_flush(
-        mut self: std::pin::Pin<&mut Self>,
+        self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Result<(), io::Error>> {
+        let self_mut = self.get_mut();
         loop {
-            let mut guard = ready!(
-                self
-                // .get_mut()
-                .inner
-                .poll_write_ready_mut(cx)
-            )?;
+            let mut guard = ready!(self_mut.inner.poll_write_ready_mut(cx))?;
 
             match guard.try_io(|inner| inner.get_mut().flush()) {
                 Ok(res) => return Poll::Ready(res),
-                Err(_wb) => continue,
+                Err(_would_block) => continue,
             }
         }
     }

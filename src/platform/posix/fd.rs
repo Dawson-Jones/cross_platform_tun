@@ -36,7 +36,7 @@ impl AsRawFd for Fd {
 
 impl Read for Fd {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = syscall!(read(self.0, buf.as_mut_ptr() as *mut _, buf.len()))?;
+        let n = syscall!(read(self.0, buf.as_ptr() as *mut _, buf.len()))?;
 
         Ok(n as _)
     }
