@@ -3,7 +3,7 @@ pub use configuration::Configuration;
 
 mod address;
 mod error;
-mod interface;
+pub mod interface;
 
 mod platform;
 pub use platform::tun;

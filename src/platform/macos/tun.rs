@@ -42,9 +42,9 @@ impl AsRawFd for Queue {
 }
 
 pub struct Tun {
-    name: String,
-    queue: Queue,
-    ctl: Fd,
+    pub(crate) name: String,
+    pub(crate) queue: Queue,
+    pub(crate) ctl: Fd,
 }
 
 impl Tun {

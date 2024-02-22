@@ -61,8 +61,13 @@ impl TunPacket {
     pub fn get_bytes(&self) -> &[u8] {
         &self.1
     }
+
+    pub fn into_bytes(self) -> Bytes {
+        self.1
+    }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct TunPacketCodec(bool, i32);
 
 impl TunPacketCodec {

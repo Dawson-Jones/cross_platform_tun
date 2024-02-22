@@ -25,7 +25,11 @@ impl AsyncTun {
         tuns.into_iter().map(AsyncTun::new).collect()
     }
 
-    fn get_mut(&mut self) -> &mut Tun {
+    pub fn get_ref(&self) -> &Tun {
+        self.inner.get_ref()
+    }
+
+    pub fn get_mut(&mut self) -> &mut Tun {
         self.inner.get_mut()
     }
 
