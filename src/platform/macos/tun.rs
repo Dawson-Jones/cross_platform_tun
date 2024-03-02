@@ -9,7 +9,7 @@ use crate::interface::Interface;
 use crate::platform::posix::fd::Fd;
 use crate::{configuration::Configuration, error::Error};
 use crate::{error::*, syscall};
-use libc::{c_char, c_uchar, c_uint, socklen_t, AF_SYS_CONTROL, IFNAMSIZ};
+use libc::{c_char, c_uchar, c_uint, socklen_t};
 
 use super::sys::*;
 
@@ -50,14 +50,14 @@ pub struct Tun {
 impl Tun {
     pub fn new(config: &Configuration) -> Result<Self> {
         let id = if let Some(name) = config.name.as_ref() {
-            if name.len() > IFNAMSIZ {
+            if name.len() > libc::IFNAMSIZ {
                 return Err(Error::NameTooLong);
             }
             if !name.starts_with("utun") {
                 return Err(Error::InvalidName);
             }
 
-            name[4..].parse::<u32>()? // +1u32 // why?
+            name[4..].parse::<u32>()? + 1u32 // why?
         } else {
             0u32
         };
@@ -92,10 +92,10 @@ impl Tun {
 
         // connect to sys control interface
         let mut addr: libc::sockaddr_ctl = unsafe { std::mem::zeroed() };
-        addr.sc_id = info.ctl_id;
         addr.sc_len = mem::size_of::<libc::sockaddr_ctl>() as c_uchar;
         addr.sc_family = libc::AF_SYSTEM as c_uchar;
-        addr.ss_sysaddr = AF_SYS_CONTROL as _;
+        addr.ss_sysaddr = libc::AF_SYS_CONTROL as _;
+        addr.sc_id = info.ctl_id;
         addr.sc_unit = id as c_uint;
         // addr.sc_reserved = [0; 5];
         syscall!(connect(
@@ -107,7 +107,7 @@ impl Tun {
         // todo: set nonblonking
 
         // get interface name
-        let mut ifname = [0u8; IFNAMSIZ];
+        let mut ifname = [0u8; libc::IFNAMSIZ];
         let mut len = ifname.len();
         syscall!(getsockopt(
             tun_fd,

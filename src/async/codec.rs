@@ -53,9 +53,10 @@ impl PacketProtocol {
 pub struct TunPacket(PacketProtocol, Bytes);
 
 impl TunPacket {
-    pub fn new(pkt: Vec<u8>) -> Self {
+    pub fn new<T: Into<Bytes>>(pkt: T) -> Self {
+        let pkt: Bytes = pkt.into();
         let proto = infer_proto(&pkt);
-        Self(proto, Bytes::from(pkt))
+        Self(proto, pkt)
     }
 
     pub fn get_bytes(&self) -> &[u8] {
@@ -64,6 +65,12 @@ impl TunPacket {
 
     pub fn into_bytes(self) -> Bytes {
         self.1
+    }
+}
+
+impl From<TunPacket> for Bytes {
+    fn from(value: TunPacket) -> Self {
+        value.1
     }
 }
 
