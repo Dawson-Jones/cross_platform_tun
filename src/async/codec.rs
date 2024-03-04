@@ -4,14 +4,14 @@ use std::io;
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, Clone, Copy, Default)]
-enum PacketProtocol {
+pub enum PacketProtocol {
     #[default]
     Ipv4,
     Ipv6,
     Other(u8),
 }
 
-fn infer_proto(pkt: &[u8]) -> PacketProtocol {
+pub fn infer_proto(pkt: &[u8]) -> PacketProtocol {
     // | version: 4bits | ihl: 4 bits | service: 8 bits | total length: 16 bits
     // | identification: 16 bits | flags: 3 bits, fragment offset: 13 bits
     // | time to live: 8 bits | protocol: 8 bits | header checksum: 16 bits
@@ -26,7 +26,7 @@ fn infer_proto(pkt: &[u8]) -> PacketProtocol {
 
 impl PacketProtocol {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    fn into_pi_field(self) -> Result<u16, io::Error> {
+    pub fn into_pi_field(self) -> Result<u16, io::Error> {
         match self {
             PacketProtocol::Ipv4 => Ok(libc::PF_INET as u16),
             PacketProtocol::Ipv6 => Ok(libc::PF_INET6 as u16),
@@ -38,7 +38,7 @@ impl PacketProtocol {
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    fn into_pi_field(self) -> Result<u16, io::Error> {
+    pub fn into_pi_field(self) -> Result<u16, io::Error> {
         match self {
             PacketProtocol::Ipv4 => Ok(libc::ETH_P_IP as u16),
             PacketProtocol::Ipv6 => Ok(libc::ETH_P_IPV6 as u16),
