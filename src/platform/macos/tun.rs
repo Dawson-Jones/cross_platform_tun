@@ -1,3 +1,4 @@
+use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::Ipv4Addr;
 use std::os::fd::{AsRawFd, RawFd};
@@ -107,7 +108,7 @@ impl Tun {
         // todo: set nonblonking
 
         // get interface name
-        let mut ifname = [0u8; libc::IFNAMSIZ];
+        let mut ifname = [0i8; libc::IFNAMSIZ];
         let mut len = ifname.len();
         syscall!(getsockopt(
             tun_fd,
@@ -121,7 +122,11 @@ impl Tun {
         let ctl_fd = syscall!(socket(libc::AF_INET, libc::SOCK_DGRAM, 0))?;
 
         let mut tun = Self {
-            name: String::from_utf8_lossy(&ifname).into_owned(),
+            name: unsafe {
+                CStr::from_ptr(ifname.as_ptr())
+                    .to_string_lossy()
+                    .to_string()
+            },
             queue: Queue {
                 tun: Fd::new(tun_fd)?,
             },
